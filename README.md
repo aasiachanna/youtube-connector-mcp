@@ -335,6 +335,37 @@ See [youtube-transcript-api documentation](https://github.com/jdepoix/youtube-tr
 
 ---
 
+## Development
+
+### Setup
+
+```bash
+git clone https://github.com/ShellyDeng08/youtube-connector-mcp.git
+cd youtube-connector-mcp
+poetry install --with dev
+```
+
+### Run Tests
+
+```bash
+poetry run pytest
+```
+
+### Publishing to PyPI
+
+```bash
+# Bump version (PyPI doesn't allow re-uploading the same version)
+poetry version patch  # 0.3.0 → 0.3.1
+poetry version minor  # 0.3.0 → 0.4.0
+poetry version major  # 0.3.0 → 1.0.0
+
+# Build and publish
+poetry build
+poetry publish
+```
+
+---
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
