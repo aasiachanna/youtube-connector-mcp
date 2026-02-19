@@ -1,5 +1,7 @@
 # YouTube MCP Server (youtube-connector-mcp)
 
+[![MCP Badge](https://lobehub.com/badge/mcp/shellydeng08-youtube-connector-mcp)](https://lobehub.com/mcp/shellydeng08-youtube-connector-mcp)
+
 `youtube-connector-mcp` is a **YouTube MCP Server / Connector** that allows AI assistants like **Claude, Cursor, Cline, Windsurf, Continue.dev, Grapes AI** to interact with the **YouTube Data API v3** via the **Model Context Protocol (MCP)**.
 
 🌐 Project Website: https://youtube-connector-mcp-website.vercel.app/  
