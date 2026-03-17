@@ -4,13 +4,19 @@ on:
   push:
     tags:
       - 'v*'
+  release:
+    types: [published]
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/youtube-connector-mcp
     steps:
       - uses: actions/checkout@v4
 
