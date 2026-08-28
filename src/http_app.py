@@ -1,5 +1,5 @@
 """HTTP wrapper for youtube-connector-mcp tools using FastAPI."""
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from typing import Optional
 import asyncio
@@ -92,3 +92,19 @@ async def manifest():
             "playlists": "/playlists/{channel_id}"
         }
     }
+
+
+    @app.post("/mcp")
+    async def mcp_endpoint(request: Request):
+        """Minimal MCP POST endpoint for connector validation.
+
+        Claude will POST to the MCP URL during connector setup. This handler
+        accepts any JSON body and returns a simple success response so Claude
+        can verify the server is reachable. Implement full MCP semantics later.
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+
+        return {"status": "ok", "message": "mcp endpoint reachable", "received": body}
