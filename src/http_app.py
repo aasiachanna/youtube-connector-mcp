@@ -97,6 +97,21 @@ async def manifest():
     }
 
 
+# Some MCP clients probe for an OAuth server discovery document at the
+# well-known path. Return a harmless 200 JSON to avoid false-positive
+# sign-in registration warnings when no OAuth is supported.
+@app.get("/.well-known/oauth-authorization-server")
+async def oauth_well_known(request: Request):
+    host = request.headers.get("host", "")
+    issuer = f"https://{host}" if host else ""
+    # Minimal OAuth metadata (empty endpoints indicate no OAuth configured)
+    return JSONResponse({
+        "issuer": issuer,
+        "authorization_endpoint": "",
+        "token_endpoint": "",
+    })
+
+
 @app.api_route("/mcp", methods=["GET", "POST"])
 async def mcp_endpoint(request: Request):
     """MCP POST endpoint.
