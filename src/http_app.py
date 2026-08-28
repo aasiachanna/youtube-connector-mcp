@@ -128,6 +128,46 @@ async def register_probe(request: Request):
     })
 
 
+# Some clients probe for a protected-resource discovery path. Return a
+# harmless 200 so the connector UI won't show a sign-in/register warning.
+@app.get("/.well-known/oauth-protected-resource")
+async def oauth_protected_resource(request: Request):
+    host = request.headers.get("host", "")
+    issuer = f"https://{host}" if host else ""
+    return JSONResponse({
+        "issuer": issuer,
+        "resource": "none",
+        "message": "no_oauth_configured",
+    })
+
+
+@app.get("/.well-known/oauth-protected-resource/mcp")
+async def oauth_protected_resource_mcp(request: Request):
+    host = request.headers.get("host", "")
+    issuer = f"https://{host}" if host else ""
+    return JSONResponse({
+        "issuer": issuer,
+        "resource": "mcp",
+        "message": "no_oauth_configured",
+    })
+
+
+# Catch-all for other well-known paths that mention oauth. Return a harmless
+# 200 JSON for oauth-related probes, otherwise 404 so we don't accidentally
+# respond to unrelated well-known requests.
+@app.get("/.well-known/{rest:path}")
+async def well_known_catchall(rest: str, request: Request):
+    if "oauth" in rest:
+        host = request.headers.get("host", "")
+        issuer = f"https://{host}" if host else ""
+        return JSONResponse({
+            "issuer": issuer,
+            "path": rest,
+            "message": "no_oauth_configured",
+        })
+    raise HTTPException(status_code=404)
+
+
 @app.api_route("/mcp", methods=["GET", "POST"])
 async def mcp_endpoint(request: Request):
     """MCP POST endpoint.
