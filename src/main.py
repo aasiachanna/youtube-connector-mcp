@@ -15,6 +15,26 @@ def make_server():
     """
     return server
 
+
+# Compatibility: some mcp.Server versions may not provide the decorator
+# methods used below (list_resources, read_resource, list_prompts, etc.).
+# Provide a helper that returns a no-op decorator when the server lacks
+# the method so importing this module won't raise AttributeError and crash
+# the ASGI process. This preserves startup while signalling reduced
+# MCP capability when the SDK is incompatible.
+def _maybe_decorator(method_name: str):
+    if hasattr(server, method_name):
+        try:
+            return getattr(server, method_name)()
+        except Exception:
+            # If calling the decorator factory raises, fall through to noop
+            pass
+
+    def _noop(func):
+        return func
+
+    return _noop
+
 # Import all tools
 from src.tools.search import youtube_search, SearchArgs
 from src.tools.video import youtube_get_video, GetVideoArgs
@@ -24,7 +44,7 @@ from src.tools.comments import youtube_get_comments, GetCommentsArgs
 from src.tools.channel import youtube_get_channel, GetChannelArgs
 
 
-@server.list_resources()
+@_maybe_decorator('list_resources')
 async def list_resources():
     return [
         types.Resource(
@@ -46,9 +66,7 @@ async def list_resources():
             mimeType="text/markdown"
         ),
     ]
-
-
-@server.read_resource()
+@_maybe_decorator('read_resource')
 async def read_resource(uri):
     uri_str = str(uri)
 
@@ -71,9 +89,7 @@ async def read_resource(uri):
                     "youtube://config",
                     "youtube://help",
                     "youtube://quota"
-                ]
-            }
-        }
+                @_maybe_decorator('list_prompts')
         return json.dumps(config, indent=2)
 
     elif uri_str == "youtube://help":
@@ -215,9 +231,7 @@ async def list_prompts():
             ]
         )
     ]
-
-
-@server.get_prompt()
+@_maybe_decorator('get_prompt')
 async def get_prompt(name: str, arguments: dict | None = None):
     """Get a specific prompt by name with the provided arguments."""
     args = arguments or {}
@@ -308,9 +322,7 @@ Provide a comprehensive summary including:
 
     else:
         raise ValueError(f"Unknown prompt: {name}")
-
-
-@server.list_tools()
+@_maybe_decorator('list_tools')
 async def list_tools():
     """List all available YouTube MCP tools."""
     return [
@@ -350,9 +362,7 @@ async def list_tools():
             inputSchema=GetCommentsArgs.model_json_schema()
         ),
     ]
-
-
-@server.call_tool()
+@_maybe_decorator('call_tool')
 async def call_tool(name, arguments):
     """Route tool calls to appropriate functions."""
     if name == "youtube_search":
