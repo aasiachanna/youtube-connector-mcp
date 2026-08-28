@@ -64,9 +64,22 @@ async def youtube_search(query: str, max_results: int = 10, order: str = "releva
             }
         }
     except Exception as e:
+        # Try to surface richer error details (googleapiclient.HttpError often
+        # exposes an HTTP body on the `content` attribute).
+        content = None
+        if hasattr(e, "content"):
+            try:
+                content = e.content.decode("utf-8") if isinstance(e.content, (bytes, bytearray)) else str(e.content)
+            except Exception:
+                content = str(e.content)
+
         return {
             "data": None,
-            "error": {"code": e.__class__.__name__, "message": str(e)},
+            "error": {
+                "code": e.__class__.__name__,
+                "message": str(e) or repr(e),
+                "details": content
+            },
             "pagination": None
         }
 
