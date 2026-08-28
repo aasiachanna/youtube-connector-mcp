@@ -1,34 +1,45 @@
-"""ASGI adapter exposing the MCP server over Streamable HTTP (SSE).
-
-This file creates a `StreamableHTTPSessionManager` for the MCP `server`
-defined in `src/main.py` and mounts it at `/mcp` in a small FastAPI app.
-Use this with `uvicorn src.http_mcp:app` (Procfile updated).
-"""
-import contextlib
+import os
 from fastapi import FastAPI
-
-from src.main import server  # the MCP Server instance defined in src/main.py
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager, StreamableHTTPASGIApp
-
-
-# Create a StreamableHTTP session manager. Keep json_response=False so the
-# transport uses SSE/event-stream by default. We don't enable resumability here.
-manager = StreamableHTTPSessionManager(server, json_response=False, stateless=False)
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from mcp.server.streamable_http_manager import StreamableHTTPASGIApp
 
 
-@contextlib.asynccontextmanager
-async def lifespan(app: FastAPI):
-    async with manager.run():
-        yield
+def make_app(server_factory):
+    """Create an ASGI app that mounts the Streamable HTTP MCP app at /mcp.
+
+    server_factory: a callable that returns a configured `mcp.server.Server` instance.
+    """
+    app = FastAPI()
+
+    # Create the manager with the server instance
+    server = server_factory()
+    manager = StreamableHTTPSessionManager(server)
+
+    # Mount the Streamable HTTP ASGI app at /mcp
+    mcp_app = StreamableHTTPASGIApp(manager)
+    app.mount("/mcp", mcp_app)
+
+    # Optionally expose a health endpoint at root
+    @app.get("/healthz")
+    def healthz():
+        return {"status": "ok"}
+
+    return app
 
 
-app = FastAPI(title="YouTube MCP (HTTP)", lifespan=lifespan)
+# Import the user's Server factory from src.main (assumes src/main.py defines `make_server`)
+try:
+    from src.main import make_server
+except Exception:
+    # Fallback: import main and call Server creation function named `create_server` or `server`
+    try:
+        from src.main import create_server as make_server
+    except Exception:
+        # As a last resort, import the Server class and create a simple server
+        from mcp.server.server import Server
 
-# Mount the Streamable HTTP ASGI app at /mcp
-streamable_app = StreamableHTTPASGIApp(manager)
-app.mount("/mcp", streamable_app)
+        def make_server():
+            return Server("youtube-connector-mcp")
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "mcp": True}
+app = make_app(make_server)
