@@ -112,6 +112,22 @@ async def oauth_well_known(request: Request):
     })
 
 
+# Some MCP clients attempt to POST to /register to register an OAuth
+# sign-in service. Return a harmless 200 response indicating no OAuth
+# is configured so the connector UI won't surface a registration error.
+@app.post("/register")
+async def register_probe(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    return JSONResponse({
+        "status": "ok",
+        "message": "no_oauth_configured",
+        "received": body,
+    })
+
+
 @app.api_route("/mcp", methods=["GET", "POST"])
 async def mcp_endpoint(request: Request):
     """MCP POST endpoint.
