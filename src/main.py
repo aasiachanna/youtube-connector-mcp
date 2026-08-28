@@ -83,13 +83,16 @@ async def read_resource(uri):
                     "youtube_get_transcript",
                     "youtube_get_playlist",
                     "youtube_list_playlists",
-                    "youtube_get_comments"
+                    "youtube_get_comments",
                 ],
                 "resources": [
                     "youtube://config",
                     "youtube://help",
-                    "youtube://quota"
-                @_maybe_decorator('list_prompts')
+                    "youtube://quota",
+                ],
+            },
+        }
+
         return json.dumps(config, indent=2)
 
     elif uri_str == "youtube://help":
@@ -180,7 +183,7 @@ Visit: https://developers.google.com/youtube/v3/getting-started#quota
 
 
 # Prompts
-@server.list_prompts()
+@_maybe_decorator('list_prompts')
 async def list_prompts():
     """List all available YouTube MCP prompts."""
     return [
