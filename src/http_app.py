@@ -95,7 +95,7 @@ async def manifest():
     }
 
 
-@app.post("/mcp")
+@app.api_route("/mcp", methods=["GET", "POST"])
 async def mcp_endpoint(request: Request):
     """MCP POST endpoint.
 
