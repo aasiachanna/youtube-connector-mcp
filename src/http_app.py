@@ -94,8 +94,8 @@ async def manifest():
     }
 
 
-    @app.post("/mcp")
-    async def mcp_endpoint(request: Request):
+@app.post("/mcp")
+async def mcp_endpoint(request: Request):
         """Minimal MCP POST endpoint for connector validation.
 
         Claude will POST to the MCP URL during connector setup. This handler
