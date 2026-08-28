@@ -5,6 +5,16 @@ from mcp.server import Server
 
 server = Server("youtube-connector-mcp")
 
+
+def make_server():
+    """Return the configured MCP Server instance.
+
+    This factory is used by the ASGI adapter to obtain the fully-configured
+    server with all tools, prompts, and resources registered. Avoids creating
+    a new empty Server which would hide registration/import errors.
+    """
+    return server
+
 # Import all tools
 from src.tools.search import youtube_search, SearchArgs
 from src.tools.video import youtube_get_video, GetVideoArgs

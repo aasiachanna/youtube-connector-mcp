@@ -1,7 +1,11 @@
 import os
 from fastapi import FastAPI
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.streamable_http_manager import StreamableHTTPASGIApp
+import logging
+import asyncio
 
 
 def make_app(server_factory):
@@ -14,6 +18,24 @@ def make_app(server_factory):
     # Create the manager with the server instance
     server = server_factory()
     manager = StreamableHTTPSessionManager(server)
+
+    # Ensure manager run lifecycle is tied to the FastAPI lifespan
+    # Use manager.run() as an async context manager tied to lifespan
+    @app.on_event("startup")
+    async def _start_manager():
+        # Enter the manager context so it begins accepting streamable sessions
+        app.state._mcp_manager_cm = manager.run()
+        await app.state._mcp_manager_cm.__aenter__()
+
+    @app.on_event("shutdown")
+    async def _stop_manager():
+        # Exit the manager context to shutdown cleanly
+        cm = getattr(app.state, "_mcp_manager_cm", None)
+        if cm is not None:
+            try:
+                await cm.__aexit__(None, None, None)
+            except Exception:
+                logging.exception("Error shutting down MCP manager")
 
     # Mount the Streamable HTTP ASGI app at /mcp
     mcp_app = StreamableHTTPASGIApp(manager)
@@ -28,18 +50,13 @@ def make_app(server_factory):
 
 
 # Import the user's Server factory from src.main (assumes src/main.py defines `make_server`)
-try:
-    from src.main import make_server
-except Exception:
-    # Fallback: import main and call Server creation function named `create_server` or `server`
-    try:
-        from src.main import create_server as make_server
-    except Exception:
-        # As a last resort, import the Server class and create a simple server
-        from mcp.server.server import Server
-
-        def make_server():
-            return Server("youtube-connector-mcp")
+from src.main import make_server
 
 
 app = make_app(make_server)
+
+
+@app.get("/manifest")
+async def manifest(request: Request):
+    # Expose the same HTTP manifest but do not use this endpoint for the MCP protocol
+    return JSONResponse({"name": "youtube-connector-mcp", "auth": {"type": "none"}})
