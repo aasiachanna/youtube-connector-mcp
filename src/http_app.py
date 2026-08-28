@@ -80,9 +80,11 @@ async def list_playlists(channel_id: str, max_results: int = 50):
 @app.get("/manifest")
 async def manifest():
     """Simple manifest describing available HTTP endpoints."""
+    # Include explicit auth declaration so MCP clients (Claude) know no sign-in is required
     return {
         "name": "youtube-connector-http",
         "description": "HTTP wrapper for youtube-connector-mcp providing search, video, transcript, comments, and playlists.",
+        "auth": {"type": "none"},
         "endpoints": {
             "search": "/search?q=...",
             "video": "/video/{video_id}",
