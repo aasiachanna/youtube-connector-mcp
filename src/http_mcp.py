@@ -14,6 +14,10 @@ def make_app(server_factory):
     server_factory: a callable that returns a configured `mcp.server.Server` instance.
     """
     app = FastAPI()
+    # Disable automatic trailing-slash redirects so POSTs to '/mcp' are
+    # not turned into 307 redirects for '/mcp/'. Streamable clients may
+    # not follow or handle redirects correctly.
+    app.router.redirect_slashes = False
 
     # Create the manager with the server instance
     server = server_factory()
@@ -41,11 +45,16 @@ def make_app(server_factory):
             except Exception:
                 logging.exception("Error shutting down MCP manager")
 
-    # Mount the Streamable HTTP ASGI app at /mcp/ (use trailing slash to
-    # avoid Starlette redirect from `/mcp` -> `/mcp/` which breaks
-    # streamable clients that don't follow 307 redirects.
+    # Create the Streamable HTTP ASGI app
     mcp_app = StreamableHTTPASGIApp(manager)
+
+    # Mount at '/mcp/' to serve the ASGI app for trailing-slash requests
     app.mount("/mcp/", mcp_app)
+
+    # Also add an explicit route for '/mcp' (no trailing slash) so Starlette
+    # won't issue a 307 redirect for POST/PUT requests. This ensures clients
+    # that post to '/mcp' (no slash) are handled directly without redirect.
+    app.add_route("/mcp", mcp_app, methods=["GET", "POST", "DELETE", "OPTIONS", "HEAD"])
 
     # Optionally expose a health endpoint at root
     @app.get("/healthz")
