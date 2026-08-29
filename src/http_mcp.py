@@ -17,7 +17,11 @@ def make_app(server_factory):
 
     # Create the manager with the server instance
     server = server_factory()
-    manager = StreamableHTTPSessionManager(server)
+    # Use stateless mode so plain POST requests without an `mcp-session-id`
+    # header are accepted. Stateful session tracking requires clients to
+    # include the session ID header and is not necessary for basic
+    # Streamable HTTP usage by Claude when using simple POST flows.
+    manager = StreamableHTTPSessionManager(server, stateless=True)
 
     # Ensure manager run lifecycle is tied to the FastAPI lifespan
     # Use manager.run() as an async context manager tied to lifespan
