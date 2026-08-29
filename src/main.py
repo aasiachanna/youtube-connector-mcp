@@ -1,9 +1,14 @@
 """MCP Server entry point - YouTube MCP Server."""
 import asyncio
 import mcp.types as types
-from mcp.server import Server
+from mcp.server import MCPServer
 
-server = Server("youtube-connector-mcp")
+# Use the higher-level `MCPServer` so decorator factories like
+# `list_tools`, `call_tool`, `list_prompts`, etc. are present and
+# can be used to register handlers via decorators. The low-level
+# `Server` does not expose those convenience decorators which can
+# lead to import-time registration being skipped.
+server = MCPServer("youtube-connector-mcp")
 
 
 def make_server():
