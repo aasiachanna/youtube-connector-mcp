@@ -41,9 +41,11 @@ def make_app(server_factory):
             except Exception:
                 logging.exception("Error shutting down MCP manager")
 
-    # Mount the Streamable HTTP ASGI app at /mcp
+    # Mount the Streamable HTTP ASGI app at /mcp/ (use trailing slash to
+    # avoid Starlette redirect from `/mcp` -> `/mcp/` which breaks
+    # streamable clients that don't follow 307 redirects.
     mcp_app = StreamableHTTPASGIApp(manager)
-    app.mount("/mcp", mcp_app)
+    app.mount("/mcp/", mcp_app)
 
     # Optionally expose a health endpoint at root
     @app.get("/healthz")
