@@ -1,14 +1,12 @@
 """MCP Server entry point - YouTube MCP Server."""
 import asyncio
 import mcp.types as types
-from mcp.server import MCPServer
+# Use the low-level Server implementation for runtime (required by the
+# StreamableHTTPSessionManager which expects the `.lifespan` attribute).
+from mcp.server.lowlevel.server import Server
 
-# Use the higher-level `MCPServer` so decorator factories like
-# `list_tools`, `call_tool`, `list_prompts`, etc. are present and
-# can be used to register handlers via decorators. The low-level
-# `Server` does not expose those convenience decorators which can
-# lead to import-time registration being skipped.
-server = MCPServer("youtube-connector-mcp")
+# Create the runtime Server instance used by the Streamable manager.
+server = Server("youtube-connector-mcp")
 
 
 def make_server():
@@ -18,6 +16,102 @@ def make_server():
     server with all tools, prompts, and resources registered. Avoids creating
     a new empty Server which would hide registration/import errors.
     """
+    # Register module-based tools once so the server's ToolManager is populated
+    # and `tools/list` reflects available tools. Import register helpers here
+    # to avoid import-time side-effects when the module is imported.
+    if not getattr(server, "_tools_registered", False):
+        try:
+            from src.tools.search import register_search_tools
+            register_search_tools(server)
+        except Exception:
+            pass
+
+        try:
+            from src.tools.video import register_video_tools
+            register_video_tools(server)
+        except Exception:
+            pass
+
+        try:
+            from src.tools.transcript import register_transcript_tools
+            register_transcript_tools(server)
+        except Exception:
+            pass
+
+        try:
+            from src.tools.playlist import register_playlist_tools
+            register_playlist_tools(server)
+        except Exception:
+            pass
+
+        try:
+            from src.tools.comments import register_comments_tools
+            register_comments_tools(server)
+        except Exception:
+            pass
+
+        try:
+            from src.tools.channel import register_channel_tools
+            register_channel_tools(server)
+        except Exception:
+            pass
+
+        setattr(server, "_tools_registered", True)
+
+    # Register low-level request handlers so the Server exposes MCP methods
+    # even when decorator factories are not present. This wraps the
+    # higher-level helper functions declared above into the low-level
+    # request handler shape: (ctx, params) -> ResultModel
+    if not getattr(server, "_handlers_registered", False):
+        # tools/list
+        async def _tools_list_handler(ctx, params):
+            tools = await list_tools()
+            return types.ListToolsResult(tools=tools)
+
+        server.add_request_handler("tools/list", types.PaginatedRequestParams, _tools_list_handler)
+
+        # tools/call
+        async def _tools_call_handler(ctx, params):
+            # params is a CallToolRequestParams pydantic model
+            name = getattr(params, "name", None)
+            arguments = getattr(params, "arguments", {}) or {}
+            result = await call_tool(name, arguments)
+            return types.CallToolResult(content=[types.TextContent(type="text", text=str(result))])
+
+        server.add_request_handler("tools/call", types.CallToolRequestParams, _tools_call_handler)
+
+        # resources/list
+        async def _resources_list_handler(ctx, params):
+            resources = await list_resources()
+            return types.ListResourcesResult(resources=resources)
+
+        server.add_request_handler("resources/list", types.PaginatedRequestParams, _resources_list_handler)
+
+        # resources/read
+        async def _resources_read_handler(ctx, params):
+            # params.uri
+            contents = await read_resource(params.uri)
+            # Convert list of Resource -> ListResourceResult expected shape
+            return types.ReadResourceResult(contents=[types.TextResourceContents(uri=str(params.uri), text=c.content) for c in contents])
+
+        server.add_request_handler("resources/read", types.ReadResourceRequestParams, _resources_read_handler)
+
+        # prompts/list
+        async def _prompts_list_handler(ctx, params):
+            prompts = await list_prompts()
+            return types.ListPromptsResult(prompts=prompts)
+
+        server.add_request_handler("prompts/list", types.PaginatedRequestParams, _prompts_list_handler)
+
+        # prompts/get
+        async def _prompts_get_handler(ctx, params):
+            result = await get_prompt(params.name, params.arguments if hasattr(params, "arguments") else None)
+            return result
+
+        server.add_request_handler("prompts/get", types.GetPromptRequestParams, _prompts_get_handler)
+
+        setattr(server, "_handlers_registered", True)
+
     return server
 
 
@@ -28,9 +122,23 @@ def make_server():
 # the ASGI process. This preserves startup while signalling reduced
 # MCP capability when the SDK is incompatible.
 def _maybe_decorator(method_name: str):
+    import inspect
+
     if hasattr(server, method_name):
+        attr = getattr(server, method_name)
+        # Some MCPServer versions implement these as coroutine handler
+        # methods (e.g. `async def list_resources`) rather than returning
+        # decorator factories. If the attribute is a coroutine function,
+        # it is not a decorator factory — return a noop decorator so
+        # module-level handler definitions remain import-safe.
+        if inspect.iscoroutinefunction(attr):
+            def _noop(func):
+                return func
+
+            return _noop
+
         try:
-            return getattr(server, method_name)()
+            return attr()
         except Exception:
             # If calling the decorator factory raises, fall through to noop
             pass
